@@ -1,0 +1,39 @@
+import yfinance as yf
+import pandas as pd
+import math
+
+# Initialising Variables
+ticker = (input("Ticker: ")).upper()
+option_type = (input("Option Type, C/P: ")).upper()
+strike = float(input("Strike Price: "))
+T = int(input("DTE: "))
+R = float(input("Risk-free rate for the next year, in decimal form (i.e. 5% is 0.05): "))
+
+# Calculate Daily Returns, Standard Deviation and Current Price
+data = yf.Ticker(ticker)
+price_data = data.history(period='1y')['Close']
+daily_returns = price_data.pct_change().dropna()
+stdev = daily_returns.std() * math.sqrt(252)
+curr_price = data.info['regularMarketOpen']  #Assumption of using the open price as the current price
+
+# Risk-Free Rate, Up & Down Factors & Risk-Neutral Probability Variables
+R_1 = math.exp(R * 1/365)
+up_fac = math.exp(stdev * math.sqrt(1/365))
+down_fac = math.exp(-stdev * math.sqrt(1/365))
+q = (R_1 - down_fac) / (up_fac - down_fac)
+
+# Function to Calculate Options Price
+def binomial_recursive(option_type, steps, price):
+    if steps == 0:
+        if option_type == "C":
+            return max(0, price - strike)  # Call option payoff
+        else:
+            return max(0, strike - price)  # Put option payoff
+    else:
+        up_price = binomial_recursive(option_type, steps - 1, price * up_fac)
+        down_price = binomial_recursive(option_type, steps - 1, price * down_fac)
+        return R_1 ** (-1) * (q * up_price + (1 - q) * down_price)
+
+# Calculate the option price
+option_price = round(binomial_recursive(option_type, T, curr_price), 4)
+print("Option price: ${option_price}")
