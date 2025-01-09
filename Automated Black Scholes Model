@@ -1,0 +1,42 @@
+###
+Black-Scholes is a well-known option pricing model and one of the more commonly used ones. 
+It is taken as an alternative to the other well-known binomial option pricing model.
+There are tons of pre-existing Python packages that calculate option prices via black-scholes but I decided to give it a go to see what I could learn.
+####
+
+from scipy.stats import norm
+import yfinance as yf
+import pandas as pd
+import math
+
+# Initialising Variables
+ticker = (input("Ticker: ")).upper()
+option_type = (input("Option type, C/P: ")).upper()
+strike = float(input("Strike price: "))
+T = int(input("DTE: "))
+R = float(input("Risk-free rate for the next year, in decimal form (i.e. 5% is 0.05): "))
+
+# Calculate Daily Returns and Standard Deviation
+data = yf.Ticker(ticker)
+price_data = data.history(period='1y')['Close']
+daily_returns = price_data.pct_change().dropna()
+stdev = daily_returns.std() * math.sqrt(252)  # Annualized volatility
+curr_price = data.info['regularMarketOpen']  #Assumption of using the open price as the current price
+
+#d1 & d2, follows well-known assumption (and limitation) that asset prices follow a lognormal distribution
+a1 = math.log(curr_price/strike)
+b1 = (R + stdev ** 2 / 2) * (T/365)
+c1 = stdev * math.sqrt(T/365)
+d1 = (a1 + b1) / c1
+d2 = d1 - stdev * math.sqrt(T/365)
+
+# Calculate Option Price
+if option_type == "C":
+    N1 = norm.cdf(d1)
+    N2 = norm.cdf(d2)
+    option_price = round(N1 * curr_price - N2 * strike * math.exp(-R * T/365), 4)
+else:
+    N1 = norm.cdf(-d1)
+    N2 = norm.cdf(-d2)
+    option_price = round(N2 * strike * math.exp(-R * T/365) - N1 * curr_price, 4) 
+print(f"The option price is : ${option_price}" )
