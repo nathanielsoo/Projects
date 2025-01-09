@@ -1,0 +1,119 @@
+###Piotroski F-Score is a score from 0 to 9 which evaluates the strength of a company's financial position.
+
+import yfinance as yf
+import pandas as pd
+import numpy as np
+
+ticker = input('Ticker: ').upper()
+stock = yf.Ticker(ticker)
+income_statement = stock.financials
+balance_sheet = stock.balance_sheet
+cash_flow = stock.cashflow
+curr_year = income_statement.columns[0]
+prev_year = income_statement.columns[1]
+
+
+
+#Data Extraction
+operating_cash_flow = cash_flow.loc['Operating Cash Flow'][curr_year]
+net_income_curr = income_statement.loc['Net Income Common Stockholders'][curr_year]
+net_income_prev = income_statement.loc['Net Income Common Stockholders'][prev_year]
+total_assets_curr = balance_sheet.loc['Total Assets'][curr_year]
+total_assets_prev = balance_sheet.loc['Total Assets'][prev_year]
+curr_assets_curr = balance_sheet.loc['Current Assets'][curr_year]
+curr_assets_prev = balance_sheet.loc['Current Assets'][prev_year]
+total_revenue_curr = income_statement.loc['Total Revenue'][curr_year]
+total_revenue_prev = income_statement.loc['Total Revenue'][prev_year]
+num_shares_curr = balance_sheet.loc['Share Issued'][curr_year]
+num_shares_prev = balance_sheet.loc['Share Issued'][prev_year]
+gross_profit_curr = income_statement.loc['Gross Profit'][curr_year]
+gross_profit_prev = income_statement.loc['Gross Profit'][prev_year]
+total_debt_curr = balance_sheet.loc['Total Debt'][curr_year]
+total_debt_prev = balance_sheet.loc['Total Debt'][prev_year]
+curr_liabilities_curr = balance_sheet.loc['Current Liabilities'][curr_year]
+curr_liabilities_prev = balance_sheet.loc['Current Liabilities'][prev_year]
+total_liabilities_curr = balance_sheet.loc['Total Liabilities Net Minority Interest'][curr_year]
+total_liabilities_prev = balance_sheet.loc['Total Liabilities Net Minority Interest'][prev_year]
+
+
+
+#Data Processing
+roa_curr = net_income_curr / total_assets_curr
+roa_prev = net_income_prev/ total_assets_prev
+accruals = operating_cash_flow / total_assets_curr
+leverage_curr = total_debt_curr / total_assets_curr
+leverage_prev = total_debt_prev / total_assets_prev
+current_ratio_curr = curr_assets_curr / curr_liabilities_curr
+current_ratio_prev = curr_assets_prev / curr_liabilities_prev
+change_in_shares = num_shares_curr - num_shares_prev
+gross_margin_curr = gross_profit_curr / total_revenue_curr
+gross_margin_prev = gross_profit_prev / total_revenue_prev
+asset_turnover_curr = total_revenue_curr / total_assets_curr
+asset_turnover_prev = total_revenue_prev / total_assets_prev
+
+
+
+#Score Calculation
+score = 0
+
+if roa_curr > 0:
+    score += 1
+    print('Strengths: ROA > 0.')
+else:
+    print('Weakness: Current ROA is negative.')
+
+if operating_cash_flow > 0:
+    score += 1
+    print('Strengths: Operating Cash Flow > 0.')
+else:
+    print('Weakness: Operating Cash Flow is negative.')
+    
+if roa_curr > roa_prev:
+    score += 1
+    print('Strengths: ROA Current > ROA Previous.')
+else:
+    print('Weakness: ROA this year is lower than the preceding year.')
+    
+if accruals > roa_curr:
+    score += 1
+    print('Strengths: Accruals > ROA Current.')
+else:
+    print('Weakness: Accruals are lower than ROA.')
+    
+if leverage_curr < leverage_prev:
+    score += 1
+    print('Strengths: Leverage Current < Leverage Previous.')
+else:
+    print('Weakness: Leverage (total debt-total assets ratio) this year is higher than the preceding year.')
+    
+if current_ratio_curr > current_ratio_prev:
+    score += 1
+    print('Strengths: Current Ratio Present > Current Ratio Previous.')
+else:
+    print('Weakness: Current ratio this year is lower than the preceding year.')
+    
+if change_in_shares <= 0:
+    score += 1
+    print('Strengths: Shares have not been diluted.')
+else:
+    print('Weakness: Number of shares issued has increased in the past year.')
+    
+if gross_margin_curr > gross_margin_prev:
+    score += 1
+    print('Strengths: Gross Margin Current > Gross Margin Previous.')
+else:
+    print('Weakness: Gross margin (gross profit-total revenue ratio) is lower than the preceding year.')
+    
+if asset_turnover_curr > asset_turnover_prev:
+    score += 1
+    print('Strengths: Asset Turnover Current > Asset Turnover Previous.')
+else:
+    print('Weakness: Asset turnover ratio (total revenue-total assets ratio) is lower than the preceding year.')
+    
+if 7 <= score <= 9:
+    strength = 'Strong'
+elif 4 <= score <= 6:
+    strength = 'Average'
+else:
+    strength = 'Weak'
+print(f"Score: {strength})
