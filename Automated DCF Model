@@ -1,0 +1,96 @@
+###Semi-automated DCF model, using yfinance
+
+
+import yfinance as yf
+import pandas as pd
+import numpy as np
+
+ticker = input('Ticker: ').upper()
+stock = yf.Ticker(ticker)
+income_statement = stock.financials
+balance_sheet = stock.balance_sheet
+cash_flow = stock.cashflow
+curr_year = income_statement.columns[0]
+prev_year = income_statement.columns[1]
+
+#Calculating Cost of Equity
+Rf = float(input("Risk free rate: "))
+price_data = stock.history(period='5y')['Close']
+Last_close = price_data.iloc[-1]
+daily_returns = price_data.pct_change().dropna()
+Rm = daily_returns.mean()
+Rm_annualised = (1 + Rm)**252 - 1
+
+index = yf.Ticker('^GSPC')
+price_index = index.history(period='5y')['Close']
+index_daily_returns = price_index.pct_change().dropna()
+aligned_returns = pd.DataFrame({'stock': daily_returns, 'index': index_daily_returns}).dropna()
+cov = np.cov(aligned_returns['stock'], aligned_returns['index'])[0, 1]
+var = np.var(aligned_returns['index'])
+beta = cov / var
+Ce = Rf + beta * (Rm_annualised - Rf)
+
+
+
+#Calculating Cost of Debt
+T = 0.21 #US Corporate Tax Rate
+Int_expense = income_statement.loc['Interest Expense'][curr_year]
+Avg_total_debt = balance_sheet.loc['Total Debt'].mean()
+Cd = Int_expense / Avg_total_debt
+
+
+
+#Debt & Equity Proportions
+Market_cap = stock.info.get('marketCap')
+Total_debt = balance_sheet.loc['Total Debt'][curr_year]
+Total_val = Market_cap + Total_debt
+
+#WACC Calculations
+WACC = (Market_cap / Total_val) * Ce + (Total_debt / Total_val) * (1 - T) * Cd
+
+
+
+#Terminal Value Calculations
+n = 5 #No. of years
+FCF = cash_flow.loc['Free Cash Flow'][curr_year]
+FCFn = FCF + abs(FCF) * ((Rm_annualised + 1) ** n -1)
+EBITDA = stock.info.get('ebitda')
+EV = stock.info.get('enterpriseValue')
+
+Sector = stock.info.get('sector')
+Industry = stock.info.get('industry')
+if 'Technology' in Sector or 'Communication' in Sector or 'Internet' in Industry:
+    Growth_rate = 0.04 #4% to be conservative (for growth stocks)
+else:
+    Growth_rate = 0.015 #1.5% to be conservative (for non-growth stocks)
+    
+TV1 = (FCFn * (1 + Growth_rate)) / (WACC - Growth_rate)
+TV2 = EBITDA * (EV / EBITDA)
+TV = (TV1 + TV2) / 2
+
+
+
+#Cash Flow Discounting
+Discount_factor = 1 + WACC
+Rate = 1 + Rm_annualised
+Total = 0
+for i in range(1, 6, 1):
+    val = FCF * Rate ** (i-1)
+    Total += val / Discount_factor ** i
+Total += TV / Discount_factor ** 5
+
+
+
+#Share Price Calculations
+Val = Total - Total_debt + balance_sheet.loc['Cash Cash Equivalents And Short Term Investments'][curr_year]
+Share_num = balance_sheet.loc['Share Issued'][curr_year]
+Share_price = Val / Share_num
+
+if Share_price < 0:
+    Margin = -(Share_price - Last_close) / Share_price * 100
+else:
+    Margin = (Share_price - Last_close) / Last_close* 100
+
+print('Last Close: ${last_close}')
+print('Fair share price: ${round(Share_price, 4)})
+print('Margin of error: {round(Margin, 4)} %')
